@@ -80,7 +80,7 @@ Commit一旦创建，其内容就不会再被直接修改。后续修改会形�
 
 ## Branch 是什么
 
-分支并不是完整复制出来的一套代码，也不是一个单独的文件夹。它本质上是一个**指向某个 Commit 的可移动标记**。
+分支并不是完整复制出来的一套代码，也不是一个单独的文件夹。它本质上是一个**指向某个 Commit 的可移动标记**（某次提交的代号）。
 
 假设项目现在有三个 Commit，`main` 分支指向最新的 Commit C：
 
@@ -467,3 +467,539 @@ flowchart LR
     D --> F
     E --> F
 ```
+
+
+
+## 普通项目变成 Git 仓库的完整过程
+
+一个普通项目变成可协作的 Git项目，通常经历以下过程：
+
+```mermaid
+flowchart LR
+    A["普通项目目录"]
+    B["初始化 Git"]
+    C["配置忽略文件"]
+    D["暂存项目文件"]
+    E["创建首次提交"]
+    F["创建远程仓库"]
+    G["关联远程地址"]
+    H["推送到远程仓库"]
+
+    A --> B --> C --> D --> E --> F --> G --> H
+```
+
+需要区分三个状态：
+
+1. 执行 `git init`：已经成为**本地 Git仓库**。
+2. 执行 `git commit`：本地仓库中已经拥有正式版本。
+3. 执行 `git push`：正式版本已经上传到**远程 Git仓库**。
+
+### 第一步：最初只是普通项目
+
+假设有一个普通商城项目：
+
+```tex
+shop
+├── src
+├── pom.xml
+├── README.md
+└── target
+```
+
+此时：
+
+- 项目可以正常开发和运行；
+- Git还没有管理这些文件；
+- 没有提交历史；
+- 没有分支；
+- 无法使用 Git比较或回退版本。
+
+```mermaid
+flowchart TD
+    P["普通项目 shop"]
+    F1["src"]
+    F2["pom.xml"]
+    F3["README.md"]
+    F4["target"]
+
+    P --> F1
+    P --> F2
+    P --> F3
+    P --> F4
+```
+
+### 第二步：初始化本地 Git 仓库
+
+进入项目根目录，执行：
+
+```bash
+git init -b main
+```
+
+该命令表示：
+
+- 在当前目录中初始化 Git；
+- 将默认分支名称设置为 `main`。
+
+执行后，项目根目录中会出现隐藏的 `.git` 目录：
+
+```tex
+shop
+├── .git
+├── src
+├── pom.xml
+├── README.md
+└── target
+```
+
+这时，项目已经是一个本地 Git仓库。
+
+```mermaid
+flowchart LR
+    A["普通项目目录"]
+    B["执行 git init"]
+    C["生成隐藏的 .git 目录"]
+    D["成为本地 Git 仓库"]
+
+    A --> B --> C --> D
+```
+
+但是，此时还没有创建任何 Commit，项目文件通常都处于“未跟踪”状态。
+
+#### `.git` 目录是什么
+
+`.git` 是整个本地 Git仓库最核心的目录。
+
+它保存的不是日常编辑的项目源码，而是 Git管理项目所需的数据：
+
+```mermaid
+flowchart TD
+    G[".git<br/>Git 仓库数据库"]
+
+    HEAD["HEAD<br/>当前所在分支或提交"]
+    CONFIG["config<br/>仓库配置和远程地址"]
+    OBJECTS["objects<br/>文件内容和提交对象"]
+    REFS["refs<br/>分支和标签指针"]
+    INDEX["index<br/>暂存区"]
+    HOOKS["hooks<br/>Git 钩子脚本"]
+
+    G --> HEAD
+    G --> CONFIG
+    G --> OBJECTS
+    G --> REFS
+    G --> INDEX
+    G --> HOOKS
+```
+
+其中最重要的内容包括：
+
+| 产物           | 作用                                       |
+| -------------- | ------------------------------------------ |
+| `.git/HEAD`    | 记录当前使用的分支或提交                   |
+| `.git/config`  | 保存当前仓库的配置和远程地址               |
+| `.git/objects` | 保存文件内容、目录结构和提交对象           |
+| `.git/refs`    | 保存分支和标签指向的提交                   |
+| `.git/index`   | 保存暂存区内容，通常在暂存文件后创建或更新 |
+| `.git/hooks`   | 保存可选的 Git自动化脚本                   |
+
+`.git` 一旦丢失，项目文件可能仍然存在，但 Git提交历史、分支和版本管理信息会丢失。
+
+因此：项目中是否存在有效的 `.git`，是判断它是否为本地 Git仓库的重要依据。
+
+### 第三步：创建 `.gitignore`
+
+正式添加文件前，应先创建 `.gitignore`：
+
+```
+shop
+├── .git
+├── .gitignore
+├── src
+├── pom.xml
+├── README.md
+└── target
+```
+
+`.gitignore` 用于告诉 Git哪些文件不应该纳入版本管理。
+
+Java项目中常见的配置是：
+
+```
+target/
+.idea/
+*.iml
+*.log
+.env
+```
+
+Node.js 项目中常见的配置是：
+
+```
+node_modules/
+dist/
+.env
+*.log
+```
+
+通常应排除：
+
+- 依赖目录；
+- 编译产物；
+- 日志和缓存；
+- IDE本地配置；
+- 临时文件；
+- 密钥和本地环境变量文件。
+
+`.gitignore` 本身应该提交到仓库，让团队成员共享相同的忽略规则。
+
+需要注意：
+
+> `.gitignore` 只对尚未被 Git跟踪的文件生效。如果密钥已经提交，仅仅加入 `.gitignore` 并不能从历史记录中删除密钥。
+
+### 第四步：检查文件状态
+
+执行：
+
+```bash
+git status
+```
+
+此时 Git通常会显示：
+
+- 当前分支；
+- 尚无提交；
+- 未跟踪文件；
+- 等待暂存的修改。
+
+状态变化如下：
+
+```mermaid
+flowchart LR
+    A["项目文件已经存在"]
+    B["Git 尚未跟踪"]
+    C["git status"]
+    D["显示为未跟踪文件"]
+
+    A --> B --> C --> D
+```
+
+`git status` 不会修改文件，只负责显示当前 Git状态。
+
+### 第五步：将文件加入暂存区
+
+执行：
+
+```bash
+git add .
+```
+
+这里的 `.` 表示选择当前目录及其子目录中符合条件的修改。
+
+Git会：
+
+- 读取项目文件；
+- 遵守 `.gitignore` 规则；
+- 将需要提交的文件内容放入暂存区；
+- 创建或更新 `.git/index`；
+- 为相关文件内容生成 Git对象。
+
+```mermaid
+flowchart LR
+    A["未跟踪或已修改的文件"]
+    B["执行 git add"]
+    C["按照 .gitignore 排除文件"]
+    D["选中的内容进入暂存区"]
+    E["等待创建 Commit"]
+
+    A --> B --> C --> D --> E
+```
+
+执行 `git add` 后：
+
+- 项目文件仍然位于原来的位置；
+- Git不会把源码移动到 `.git` 中；
+- 只是记录“下一次提交准备包含哪些内容”；
+- 此时仍然没有产生 Commit。
+
+### 第六步：创建第一次提交
+
+执行：
+
+```bash
+git commit -m "Initial commit"
+```
+
+`Initial commit` 是提交说明，表示“第一次提交”。
+
+Git会创建第一个 Commit：
+
+```mermaid
+flowchart LR
+    A["暂存区中的项目状态"]
+    B["执行 git commit"]
+    C["创建第一个 Commit"]
+    D["生成唯一提交编号"]
+    E["main 指向该 Commit"]
+
+    A --> B --> C --> D --> E
+```
+
+第一次提交主要产生以下信息：
+
+- 项目文件快照；
+- 目录结构；
+- 提交说明；
+- 提交者；
+- 提交时间；
+- 唯一提交编号。
+
+例如：
+
+```
+7e8f1c2 Initial commit
+```
+
+第一次提交没有上一个父提交。后续提交会指向前一个提交：
+
+```mermaid
+flowchart LR
+    A["Commit A<br/>Initial commit"]
+    B["Commit B<br/>添加用户登录"]
+    C["Commit C<br/>修复登录错误"]
+    MAIN["main"]
+
+    A --> B --> C
+    C -.->|"指向"| MAIN
+```
+
+到这里，即使没有连接 GitHub、GitLab 或 Gitee，项目也已经是一个完整的本地 Git仓库，并且可以：
+
+- 查看修改；
+- 创建分支；
+- 创建更多提交；
+- 比较版本；
+- 回退代码；
+- 创建 Worktree。
+
+### 第七步：创建远程仓库
+
+接下来，可以在 GitHub、GitLab 或 Gitee上创建远程仓库。
+
+例如，在 Gitee上创建：
+
+```
+https://gitee.com/username/shop.git
+```
+
+推荐为已有本地项目创建一个**空的远程仓库**，暂时不要勾选自动生成：
+
+- README；
+- `.gitignore`；
+- License。
+
+否则远程仓库会提前产生一个本地没有的提交，第一次推送时可能需要额外合并历史。
+
+创建远程仓库后，会产生：
+
+- 一个远程仓库地址；
+- 一个远程 Git数据库；
+- 项目的访问权限设置；
+- 用于团队协作的网页入口。
+
+但此时，本地仓库与远程仓库还没有建立联系。
+
+```mermaid
+flowchart LR
+    L["本地 Git 仓库<br/>已经有 Initial commit"]
+    R["远程 Git 仓库<br/>目前为空"]
+
+    L -.->|"尚未关联"| R
+```
+
+### 第八步：关联远程仓库
+
+执行：
+
+```bash
+git remote add origin https://gitee.com/username/shop.git
+```
+
+这条命令表示：
+
+- 添加一个远程仓库；
+- 将其命名为 `origin`；
+- 保存远程仓库地址。
+
+`origin` 只是远程仓库的默认别名，也可以使用其他名称。
+
+关联后，远程地址会被记录在：
+
+```
+.git/config
+```
+
+逻辑关系如下：
+
+```mermaid
+flowchart LR
+    L["本地仓库"]
+    O["远程别名 origin"]
+    R["Gitee 远程仓库"]
+
+    L --> O --> R
+```
+
+此时只是记录了远程地址，代码还没有上传。
+
+可以使用下面的命令检查远程地址：
+
+```bash
+git remote -v
+```
+
+### 第九步：推送到远程仓库
+
+执行：
+
+```bash
+git push -u origin main
+```
+
+这条命令表示：
+
+- `push`：上传本地提交；
+- `origin`：上传到名为 `origin` 的远程仓库；
+- `main`：上传本地 `main` 分支；
+- `-u`：建立本地 `main` 与远程 `origin/main` 的跟踪关系。
+
+```mermaid
+flowchart LR
+    L["本地 main<br/>包含 Initial commit"]
+    P["执行 git push"]
+    R["远程 origin/main<br/>接收提交和文件版本"]
+    T["建立本地与远程分支的跟踪关系"]
+
+    L --> P --> R
+    P --> T
+```
+
+推送时上传的主要内容包括：
+
+- Commit对象；
+- 被提交的文件内容；
+- 项目目录结构；
+- 分支指针；
+- 相关 Git历史。
+
+不会上传：
+
+- 尚未提交的修改；
+- 暂存但尚未提交的内容；
+- 被 `.gitignore` 排除的文件；
+- 其他没有纳入提交的本地文件。
+
+推送完成后，Gitee网页上就可以看到项目代码和提交历史。
+
+### 本地与远程分别有哪些产物
+
+完成整个流程后，本地目录中主要存在：
+
+```
+shop
+├── .git
+├── .gitignore
+├── src
+├── pom.xml
+└── README.md
+```
+
+本地产物可以分为两类：
+
+| 类型        | 内容                                    |
+| ----------- | --------------------------------------- |
+| 项目文件    | `src`、`pom.xml`、`README.md` 等        |
+| Git管理数据 | `.git` 中的提交、分支、暂存区和远程配置 |
+
+远程仓库中主要存在：
+
+- 被提交并推送的项目文件版本；
+- Commit历史；
+- `main` 等远程分支；
+- 标签；
+- 仓库权限和协作配置；
+- Pull Request 或 Merge Request 等协作记录。
+
+### `.gitignore` 会不会上传
+
+`.gitignore` 本身通常会被提交并上传。
+
+它里面记录的是忽略规则，例如：
+
+```
+.env
+target/
+node_modules/
+```
+
+实际效果是：
+
+```mermaid
+flowchart TD
+    P["项目文件"]
+
+    A["src<br/>需要提交"]
+    B["README.md<br/>需要提交"]
+    C[".gitignore<br/>需要提交"]
+    D[".env<br/>被忽略"]
+    E["target<br/>被忽略"]
+
+    P --> A --> R["进入 Commit 并推送"]
+    P --> B --> R
+    P --> C --> R
+    P --> D --> X["不进入 Commit"]
+    P --> E --> X
+```
+
+### 最常用的完整命令
+
+假设已经进入项目根目录：
+
+```
+git init -b main
+git status
+git add .
+git commit -m "Initial commit"
+git remote add origin https://gitee.com/username/shop.git
+git push -u origin main
+```
+
+如果当前电脑是第一次使用 Git，还需要配置提交者身份：
+
+```
+git config --global user.name "你的名字"
+git config --global user.email "你的邮箱"
+```
+
+这项配置通常只需要执行一次。
+
+### 整个过程中项目状态如何变化
+
+```mermaid
+flowchart TD
+    A["普通项目<br/>只有项目文件"]
+    B["本地 Git 仓库<br/>生成 .git"]
+    C["已暂存项目<br/>生成或更新暂存区"]
+    D["拥有正式版本<br/>创建 Initial commit"]
+    E["已关联远程仓库<br/>保存 origin 地址"]
+    F["可远程协作<br/>提交已经推送"]
+
+    A -->|"git init"| B
+    B -->|"git add"| C
+    C -->|"git commit"| D
+    D -->|"git remote add"| E
+    E -->|"git push"| F
+```
+
+最重要的结论是：
+
+> `git init` 让普通项目成为本地 Git仓库，`git add` 选择提交内容，`git commit` 创建正式版本，`git remote add` 关联远程仓库，`git push` 才把本地提交上传到 GitHub、GitLab 或 Gitee。
