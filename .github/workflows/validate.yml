@@ -1,0 +1,16 @@
+name: Validate repository
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  validate-markdown:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify tutorial file is present and non-empty
+        shell: bash
+        run: test -s 'Git 原理.md'
