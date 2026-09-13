@@ -583,17 +583,9 @@ flowchart LR
 
 ### 定时任务
 
-定时任务又称**计划任务**，不是简单地“定期发送一条对话消息”，而是把以下内容保存成一个可以重复执行的后台任务：
+定时任务又称**计划任务**。
 
-- 本次运行要完成什么工作
-- 在什么时间或事件发生时运行
-- 需要使用哪些插件、Skill 和数据源
-- 每次运行是开启独立任务，还是继续原有任务
-- 结果保存到哪里，以及是否执行发送邮件等外部操作
-
-计划任务可以选择继续在已有任务中运行，也可以选择每次运行时新建聊天。
-
-注意：定时任务会在无人值守的情况下运行，因此应该遵循最小权限原则。
+已安排任务让 ChatGPT 在未来某一时刻或按固定频率运行：可以是一次性提醒、每日/每周的内容推送，也可以监控变化后通知你。任务会在用户不在线时照常执行，并通过推送或邮件通知；之后可在 **Scheduled** 页面查看、编辑（例如设置继续在已有任务中运行，或每次运行时新建聊天）、暂停或删除。可用性、精确时间与频率取决于你的账户、设备和套餐。
 
 > [OpenAI 计划任务说明](https://learn.chatgpt.com/docs/automations?translationFallback=zh-Hans)
 
@@ -1379,3 +1371,85 @@ flowchart LR
 
 
 ## Codex MCP
+
+![image-20260913171201490](Codex 用法_imgs/image-20260913171201490.png)
+
+### MCP 是什么
+
+除了插件和 Skill，还可以通过 MCP 扩展 Codex 的能力。
+
+MCP 全称 **Model Context Protocol，模型上下文（通信）协议**。用于让 AI 模型与外部工具和数据源进行通信。
+
+可以这样理解：
+
+- **Codex**：负责理解需求、规划任务和决定调用哪个工具
+- **MCP 连接**：负责按照统一协议**传递请求和结果**
+- **MCP Server**：负责提供具体工具和数据
+- **外部服务**：真正保存数据或执行操作，例如 GitHub、Figma、浏览器和内部文档系统
+
+```mermaid
+flowchart LR
+    A[用户] --> B[Codex]
+    B --> A
+    B --> C[MCP 连接]
+    C --> D[MCP Server]
+    D --> E[GitHub API]
+    E --> D
+    D --> C
+    C --> B
+```
+
+MCP Server 可以向 Codex 提供：
+
+- 第三方文档和共享知识
+- 查询和操作工具
+- 访问 GitHub、Figma、浏览器等外部系统的能力
+
+> [OpenAI MCP 官方说明](https://learn.chatgpt.com/docs/extend/mcp?translationFallback=zh-Hans)
+
+### MCP、Skill、插件的区别
+
+| 能力       | 主要作用                                     |
+| ---------- | -------------------------------------------- |
+| Skill      | 告诉 Codex 应该按照什么流程完成任务          |
+| MCP        | 规定 Codex 如何连接外部工具/数据源           |
+| MCP Server | 真正提供查询和操作工具                       |
+| 插件       | 可安装的软件包，可以包含 Skill 和 MCP Server |
+
+```mermaid
+flowchart LR
+    A[插件] --> B[Skill<br/>规定工作流程]
+    A --> C[MCP Server<br/>提供外部工具]
+    B --> D[Codex 按流程工作]
+    C --> D
+```
+
+直接配置 MCP 的优点是控制更细，可以自行设置服务器地址、认证信息、可用工具和审批方式；插件则更适合希望简化安装流程的普通用户。
+
+### Git 与 GitHub MCP 的区别
+
+Codex 可以通过 Git 命令完成本地版本管理，例如：
+
+- 查看和修改文件
+- 创建分支
+- 创建提交
+- 合并分支
+- 拉取或推送代码
+
+但是 Issue、Pull Request、PR 评论和 GitHub Actions 等内容保存在 GitHub 平台上，不属于 Git 仓库本身。
+
+```mermaid
+flowchart TD
+    A[本地 Git 仓库] --> B[文件、分支和提交]
+    A --> C[push / pull]
+
+    C --> D[GitHub 远程仓库]
+    D --> E[Issue]
+    D --> F[Pull Request]
+    D --> G[PR 评论和审查]
+    D --> H[GitHub Actions]
+```
+
+这些功能需要通过 GitHub 网站、GitHub CLI、GitHub 插件或者 GitHub API 操作。GitHub MCP Server 的作用，就是把 GitHub API 封装成 Codex 能够调用的工具。
+
+MCP 并不是完成这些操作的唯一方法。例如，已经安装并登录 GitHub CLI 时，也可以使用 `gh issue`、`gh pr` 等命令。
